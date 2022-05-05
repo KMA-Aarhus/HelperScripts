@@ -1,6 +1,14 @@
 # HelperScripts
 Collection of small helper scripts
 
+<h3>create_primer_files.py</h3>
+<p>Creates primer.bed, insert.bed, amplicon.bed and json file from a .scheme.bed file such as that found on 
+https://github.com/epi2me-labs/wf-artic/tree/master/data/primer_schemes/SARS-CoV-2/Midnight-ONT/V3</p>
+<p>Run as:</p>
+<code>python create_primer_files.py ".scheme.bed" "output location" </code>
+<p>Example:</p>
+<code>python create_primer_files.py Midnight-ONT-V3/SARS-CoV-2.scheme.bed Midnight-ONT-V3/ </code>
+
 <h3>create_primer_json.py</h3>
 <p>Creates a primer.json file from a primer.bed file</p>
 <p>Run as:</p>
