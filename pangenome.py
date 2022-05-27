@@ -1,161 +1,135 @@
 import io
 import os
 import sys
+import pysam
 import numpy as np
 import pandas as pd
+import collections
 
 import matplotlib.cm as cm
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 
+def parse_cov(cov_file):
+	cov = open(cov_file, "r")
+	l = cov.readline().replace("\n","")
+	masked = []
+	while l != "":	
+		start = int(l.split()[1])
+		end = int(l.split()[2])
+		masked += range(start,end)
 
-def read_vcf(path):
-	# pretty self-explanatory
-    with open(path, 'r') as f:
-        lines = [l for l in f if not l.startswith('##')]
-    return pd.read_csv(
-        io.StringIO(''.join(lines)),
-        dtype={'#CHROM': str, 'POS': int, 'ID': str, 'REF': str, 'ALT': str,
-               'QUAL': str, 'FILTER': str, 'INFO': str},
-        sep='\t'
-    ).rename(columns={'#CHROM': 'CHROM'})
+		l = cov.readline().replace("\n","")
+	return masked
+
+def read_vcf(v):
+	# Annotates vcf with AA changes
+	vcf_annotate_cmd = "vcf-annotator --output " + v + " " + v + " MN908947.3.gb"
+	os.system(vcf_annotate_cmd)
+
+	# Read in variant file
+	vcf = pysam.VariantFile(v, 'r')
+	v_dict = {}
+	pos_dict = {}
+	for var in vcf:
+		if 'SupportFraction' not in var.info:
+			print("SupportFraction not found. Is your vcf file generated from Illumina data?")
+			break
+		if 'AminoAcidChange' not in var.info:
+			print("AminoAcidChange not found. Something likely went wrong in vcf-annotator")
+			break
+		if 'Gene' not in var.info:
+			print("Gene not found. Something likely went wrong in vcf-annotator")
+			break
+		# Convoluted but working formatting of the AA and Gene strings
+		AA = str(var.info['AminoAcidChange']).replace("('", "").replace("',)", "")
+		gene = str(var.info['Gene']).replace("('", "").replace("',)", "")
+
+		# Excludes synonymous/silent mutations, creates unique gene+AA identifier and saves frequency and position in separate dictionaries
+		if AA != ".":			
+			AA = gene+":"+AA
+			v_dict[AA] = var.info['SupportFraction']
+			pos_dict[AA] = var.pos
+	# Variant dictionary contains a frequency for each AA change. Position dictionary contains a position for each AA change. Position is required to check for coverage.
+	return v_dict, pos_dict
 
 
 def get_allele_freq_subs(vcf_folder):
-	# handle allele frequency from .vcf files
+	# Create two lists of files, one for vcf files and one for coverage files.
 	vcf_files = []
+	cov_files = []
 	for root, dirs, files in os.walk(vcf_folder):
 		for file in files:
 			if file.endswith(".vcf"):
 				vcf_files.append(os.path.join(root, file))
+			if file.endswith(".coverage_mask.txt"):
+				cov_files.append(os.path.join(root, file))
 
-	vcf_files.sort()
-	al_freqs = []
-	subs = []
+
+	# Collects lists of missing coverage positions. 
+	cov_dict = {}
+	# Collects the AA changes and frequencies for each sample
+	sample_dicts = {}
+	# Combined dictionary of all AA changes and their nucleotide positions
+	aa_pos = {}
+
+	dates = []
+	# Will contain final dictionary of variants and sample frequencies
+	v_dict = {}
+
+	# Parses coverage files and fills the missing coverage lists of nucleotide positions
+	for cov_file in cov_files:
+		date = str(cov_file.split("/")[-1].split(".")[0])
+		masked = parse_cov(cov_file)
+		cov_dict[date] = masked
+
+	# Parses vcf files to dictionaries
 	for v in vcf_files:
-		df = read_vcf(v)
-		df_subs = df[['POS', 'REF', 'ALT']]
-		df = df['INFO']
+		tmp_dict, pos_dict = read_vcf(v)
+		date = str(v.split("/")[-1].split(".")[0])
+		dates.append(date)
+		sample_dicts[date] = tmp_dict
+		for key in tmp_dict:
+			v_dict[key] = {}
+		aa_pos.update(pos_dict)
+
+	# Finally joins AA changes with corresponding nucleotide positions and frequency data for all samples. The dictionary is formatted as:
+	# AAC1: {pos:nucleotide_position, sample1:freq, sample2:freq, sample3:freq}
+	for var in v_dict:
+		v_dict[var]["pos"] = int(aa_pos[var])
+		for d in sample_dicts.keys():
+			if var in sample_dicts[d]:
+				v_dict[var][d] = sample_dicts[d][var]
+				# For AA changes not observed in a given sample, we must determine if this is due to the variant not being present or just missing coverage
+			else:				
+				if v_dict[var]["pos"] not in cov_dict[d]:
+					v_dict[var][d] = 0
+				else:
+					v_dict[var][d] = None
 		
-		for i in range(len(df)):
-			tmp = df[i]
-			tmp = tmp.split(';')
+	return v_dict, dates
 
-			for j in range(len(tmp)):
-				if tmp[j][:3] == 'DP=':
-					dp_val = int(tmp[j][3:])
-				elif tmp[j][:3] == 'AD=':
-					# this stunt is used since we are handling illumina reads
-					# if not, then it is possible to reduce the lines to one
-					ap_val = tmp[j][3:]
-					ap_val = ap_val.split(',')
-					ap_val = int(ap_val[0]) + int(ap_val[1])
-
-			al_freqs.append(ap_val/dp_val)
-
-		tmp_subs = df_subs['REF'] + df_subs['POS'].astype(str) + df_subs['ALT']
-		subs.append(','.join(tmp_subs.tolist()))
-
-	return al_freqs, pd.DataFrame(subs)
-
-
-def pangenome_plot(vcf_folder, id_file):
-
-	al_freqs, subs = get_allele_freq_subs(vcf_folder)
-
-	# handle substitution and dates
-	df2 = pd.read_csv(id_file, sep='\t')
-	n2, m2 = df2.shape
-	dates = df2['sampling_date']
-
-	# looks wierd, but is necessary
-	# overwrites the substitutions noted in the .tsv file
-	df2['substitutions'] = subs
-	subs = df2['substitutions']
-
-
-	# handling overlapping dates
-	# only works if there are only two dates overlapping
-	unique_dates = []
-	i = 0
-	while i < len(dates)-1:
-		if dates[i] == dates[i+1]:
-			unique_dates.append(dates[i] + '(1)')
-			unique_dates.append(dates[i] + '(2)')
-			i += 2
-		else:
-			unique_dates.append(dates[i])
-			i += 1
-
-	# special case: if we end on a unique date
-	if i < len(dates):
-		unique_dates.append(dates[i])
-
-	dates = unique_dates
-	df2['sampling_date'] = unique_dates
-
-	# finding unique substitutions for y-axis labels
-	pre_suf_dict = {}
-	cleaned_subs = []
-
-	for i in range(n2):
-		tmp_sub = subs[i].split(',')
-
-		for j in range(len(tmp_sub)):
-			clean_sub = tmp_sub[j][1:-1]
-			cleaned_subs.append(int(clean_sub))
-
-			if clean_sub not in pre_suf_dict.keys():
-				pre_suf_dict[clean_sub] = tmp_sub[j][0] + tmp_sub[j][-1]
-
-	cleaned_subs = list(set(cleaned_subs))
-	cleaned_subs.sort()
-	cleaned_subs = [str(cleaned_subs[i]) for i in range(len(cleaned_subs))]
-
-	sub_dict = {cleaned_subs[i]: i for i in range(0, len(cleaned_subs))}
-
-	# finding unique dates for x-axis labels
-	cleaned_dates = []
-
-	for i in range(n2):
-		cleaned_dates.append('-'.join(dates[i].split('-')[-2:]))
-
-	cleaned_dates = list(set(cleaned_dates))
-	cleaned_dates.sort()
-	cleaned_dates = [cleaned_dates[i].replace('-', '/') for i in range(len(cleaned_dates))]
-
-	date_dict = {cleaned_dates[i]: i for i in range(0, len(cleaned_dates))}
-
-	# create dataset for plotting
-	x_vals = []
-	y_vals = []
-
-	for i in range(n2):
-		tmp_sub = subs[i].split(',')
-
-		for j in range(len(tmp_sub)):
-			clean_sub = tmp_sub[j][1:-1]
-			clean_date = '-'.join(dates[i].split('-')[-2:])
-			clean_date = clean_date.replace('-', '/')
-
-			x_vals.append(date_dict[clean_date])
-			y_vals.append(sub_dict[clean_sub])
-
-	# recreate substitutions for labeling the y-axis
-	new_y_axis = []
-
-	for i in range(len(cleaned_subs)):
-		tmp = cleaned_subs[i]
-		pre_suf = pre_suf_dict[tmp]
-
-		new_y_axis.append(pre_suf[0] + tmp + pre_suf[1])
-
+def create_gene_plot(df,gene,dates,vcf_folder):
 	############
 	# plotting #
 	############
+	# Reduces dataframe to one gene as we create one figure per gene to avoid crowding
+	df = df[df["gene"] == gene]
+	# Because of the way the dateframe is set up, it was easier to neccesary to iterate over the rows in the dataframe
+	x_dates, frequencies, y_aa= ([] for i in range(3))
 
-	# setting file name (assumes that it is called idXXX.tsv)
-	plt_filename = 'pangenome_' + id_file[:5] + '.png'
+	for index, row in df.iterrows():
+		for date in dates:
+			x_dates.append(date)
+			y_aa.append(row['AA'])
+			frequencies.append(row[date])
+
+	# To use as labels, get unique AA changes and dates. As we want to maintain the sort on nucleotide positions, we have to do this in a slightly complicated manner that maintains the ordering by index
+	xlabs = [x_dates[index] for index in sorted(np.unique(x_dates, return_index=True)[1])]
+	ylabs = [y_aa[index] for index in sorted(np.unique(y_aa, return_index=True)[1])]
+
+	# set filename
+	plt_filename = 'pangenome_plot_'+gene+'.png'
 
 	# setting fixed plot size corresponding to A4 page
 	plt.rcParams["figure.figsize"] = (8.27, 11.69)
@@ -163,51 +137,59 @@ def pangenome_plot(vcf_folder, id_file):
 	fig, ax = plt.subplots()
 
 	# create gradient legend
-	cm = plt.cm.get_cmap('RdYlBu')
-	sc = plt.scatter(x_vals, y_vals, c=al_freqs, s=100, cmap=cm)
+	cm = plt.cm.get_cmap('coolwarm')
+	sc = plt.scatter(x_dates, y_aa, c=frequencies, s=100, cmap=cm)
 	plt.colorbar(sc, fraction=0.046, pad=0.04)
 
 	# setting labels for x-axis and rotating
-	ax.set_xticks(list(range(len(cleaned_dates))))
-	ax.set_xticklabels(cleaned_dates)
-	plt.xticks(rotation=300)
+	#ax.set_xticks(list(range(len(set(x_dates)))))
+	plt.xticks(ticks=range(len(xlabs)), labels=xlabs)
+
+
+	#plt.yticks(ticks=range(len(y_aa_values)), labels=y_aa_values)
+
+	#plt.xticks(rotation=300)
 
 	# setting labels for y-axis
-	ax.set_yticks(list(range(len(cleaned_subs))))
-	ax.set_yticklabels(new_y_axis)
+	plt.yticks(ticks=range(len(ylabs)), labels=ylabs)
 	plt.gca().invert_yaxis()
 
 	# saving loaded figure to filename given earlier
-	plt.savefig(plt_filename, bbox_inches='tight')
+	plt.savefig(vcf_folder+"/"+plt_filename, bbox_inches='tight')
 	plt.close()
 	return
 
+
+def pangenome_plots(vcf_folder):
+
+	v_dict, dates = get_allele_freq_subs(vcf_folder)
+	# Convert the dictionary containing AA changes and frequencies to a dataframe for plotting
+	df = pd.DataFrame(data=v_dict)
+	df = df.transpose()
+	df = df.astype({'pos':'int'})
+	df["gene"] = [var.split(":")[0] for var in df.index]
+	df["AA"] = [var.split(":")[1] for var in df.index]
+	# Sort the dataframe to keep ordering based on positions
+	df = df.sort_values(by =["pos"])
+	# create dataset for plotting
+	for gene in set(df["gene"]):
+		print("Creating figure for ", gene, "gene")
+		create_gene_plot(df,gene, dates,vcf_folder)
 
 if __name__ == '__main__':
 	################################################################################
 	# Description:
 	# - This scripts greates a pangenome plot for a patient that 
-	#	has had multiple samples taken across a span of time. It 
-	#	was specifically used for 4 samples that all had the naming 
-	#	format idXXX. Furthermore, a .tsv file was included which
-	# 	had metadata for the tests taken. This was used for the x-axis
-	# 	labels. The .tsv file also included the substitutions, but
-	#	there were less noted than in the .vcf files. Therefore the 
-	#	substitutions noted in the .vcf files were used.
+	#	has had multiple samples taken across a span of time. 
 	#
 	# Input:
-	# - One folder of .vcf files (assuming illumina reads)
-	# - One .tsv file with dates of samples (metadata)
+	# - One folder of .vcf and coverage mask files (assuming from Oxford Nanopore Sequencing reads)
 	#
 	# Example usage:
-	# - python pangenome.py idXXX/ idXXX/idXXX.tsv
+	# - python pangenome.py filedir outdir
 	# 
-	# 	If id of patient is not in format idXXX, of alot of indices above breaks.
-	# 	If date is not noted in format 'YYYY-MM-DD', the above breaks as well.
-	#	Assumes that the .vcf and .tsv files are orderered by sample_id, and 
-	#	therefore also ordered by date. Good luck!
+	#	Assumes that the dates contained in the filenames is a close approximation to sample time. If not, rename files to reflect correct dates.
 	
 	vcf_folder = sys.argv[1]
-	id_file = sys.argv[2]
 
-	pangenome_plot(vcf_folder, id_file)
+	pangenome_plots(vcf_folder)
