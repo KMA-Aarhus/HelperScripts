@@ -22,6 +22,14 @@ https://github.com/epi2me-labs/wf-artic/tree/master/data/primer_schemes/SARS-CoV
 <p>Run as:</p>
 <code>python locate_move_vcf.py idXXX.tsv /SEARCH_FOLDER/ /TARGET_FOLDER/</code>
 
+<h3>files_for_pangenome.py</h3>
+<p>This scripts takes as input a file of sample ids, one number per line, and finds the newest vcf and coverage mask files and copies them to a user specified location </p>
+<p>Input:</p>
+<p>One file containing sample ids</p>
+<p>An output directory</p>
+<p> Example usage:</p>
+<code>python files_for_pangenome.py prøveliste.txt outdir</code>
+  
 <h3>pangenome.py</h3>
 <p>This scripts greates a pangenome plot for a patient that has had multiple samples taken across a span of time. </p>
 <p>Input:</p>
