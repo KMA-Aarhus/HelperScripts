@@ -23,6 +23,9 @@ https://github.com/epi2me-labs/wf-artic/tree/master/data/primer_schemes/SARS-CoV
 <code>python locate_move_vcf.py idXXX.tsv /SEARCH_FOLDER/ /TARGET_FOLDER/</code>
 
 <h3>pangenome.py</h3>
-<p>This scripts greates a pangenome plot for a patient that has had multiple samples taken across a span of time. It was specifically used for 4 samples that all had the naming format idXXX. Furthermore, a .tsv file was included which had metadata for the tests taken. This was used for the x-axis labels. The .tsv file also included the substitutions, but there were less noted than in the .vcf files. Therefore the substitutions noted in the .vcf files were used.</p>
-<p>Run as:</p>
-<code>python pangenome.py idXXX/ idXXX/idXXX.tsv</code>
+<p>This scripts greates a pangenome plot for a patient that has had multiple samples taken across a span of time. </p>
+<p>Input:</p>
+<p>One folder of .vcf and coverage mask files (assuming from Oxford Nanopore Sequencing reads)</p>
+<p> Example usage:</p>
+<code>python pangenome.py filedir outdir</code>
+<p>Assumes that the dates contained in the filenames is a close approximation to sample time. If not, rename files to reflect correct dates.</p>
