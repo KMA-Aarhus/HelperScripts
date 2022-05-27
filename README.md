@@ -29,6 +29,7 @@ https://github.com/epi2me-labs/wf-artic/tree/master/data/primer_schemes/SARS-CoV
 <p>An output directory</p>
 <p> Example usage:</p>
 <code>python files_for_pangenome.py prøveliste.txt outdir</code>
+<p>It looks through pappenheim_clean first in order to locate the correct directory in pappeneheim_raw. This is neccesary due to the very large amount of files present in the pappenheim_raw location which takes more than 2 minuter per sample if subdir is not specified. Also avoids causing slowdown in read/writing.</p>
   
 <h3>pangenome.py</h3>
 <p>This scripts greates a pangenome plot for a patient that has had multiple samples taken across a span of time. </p>
