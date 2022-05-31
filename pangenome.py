@@ -1,5 +1,6 @@
 import io
 import os
+import subprocess
 import sys
 import pysam
 import numpy as np
@@ -25,7 +26,7 @@ def parse_cov(cov_file):
 def read_vcf(v):
 	# Annotates vcf with AA changes
 	vcf_annotate_cmd = "vcf-annotator --output " + v + " " + v + " MN908947.3.gb"
-	os.system(vcf_annotate_cmd)
+	subprocess.run(vcf_annotate_cmd.split())
 
 	# Read in variant file
 	vcf = pysam.VariantFile(v, 'r')
