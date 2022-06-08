@@ -32,9 +32,9 @@ https://github.com/epi2me-labs/wf-artic/tree/master/data/primer_schemes/SARS-CoV
 <p>It looks through pappenheim_clean first in order to locate the correct directory in pappeneheim_raw. This is neccesary due to the very large amount of files present in the pappenheim_raw location which takes more than 2 minuter per sample if subdir is not specified. Also avoids causing slowdown in read/writing.</p>
   
 <h3>pangenome.py</h3>
-<p>This scripts greates a pangenome plot for a patient that has had multiple samples taken across a span of time. </p>
+<p>This scripts greates a pangenome plot per gene for a patient that has had multiple samples taken across a span of time. Requires the genbank file to be present in the script directory: MN908947.3.gb</p>
 <p>Input:</p>
 <p>One folder of .vcf and coverage mask files (assuming from Oxford Nanopore Sequencing reads)</p>
 <p> Example usage:</p>
-<code>python pangenome.py filedir outdir</code>
+<code>python pangenome.py filedir</code>
 <p>Assumes that the dates contained in the filenames is a close approximation to sample time. If not, rename files to reflect correct dates.</p>
