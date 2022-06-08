@@ -45,12 +45,17 @@ def read_vcf(v):
 		# Convoluted but working formatting of the AA and Gene strings
 		AA = str(var.info['AminoAcidChange']).replace("('", "").replace("',)", "")
 		gene = str(var.info['Gene']).replace("('", "").replace("',)", "")
+		syn = str(var.info['IsSynonymous']).replace("('", "").replace("',)", "")
+		# We will probably need this to handle deletions/insertions
+		VarType = str(var.info['VariantType']).replace("('", "").replace("',)", "")
+		qual = var.qual
 
-		# Excludes synonymous/silent mutations, creates unique gene+AA identifier and saves frequency and position in separate dictionaries
-		if AA != ".":			
+		# Excludes synonymous/silent mutations and low quality mutations, creates unique gene+AA identifier and saves frequency and position in separate dictionaries
+		if AA != "." and syn != "1" and qual >=100:			
 			AA = gene+":"+AA
 			v_dict[AA] = var.info['SupportFraction']
 			pos_dict[AA] = var.pos
+
 	# Variant dictionary contains a frequency for each AA change. Position dictionary contains a position for each AA change. Position is required to check for coverage.
 	return v_dict, pos_dict
 
@@ -65,6 +70,8 @@ def get_allele_freq_subs(vcf_folder):
 				vcf_files.append(os.path.join(root, file))
 			if file.endswith(".coverage_mask.txt"):
 				cov_files.append(os.path.join(root, file))
+	vcf_files=sorted(vcf_files)	
+	cov_files=sorted(cov_files)			
 
 
 	# Collects lists of missing coverage positions. 
@@ -116,7 +123,7 @@ def create_gene_plot(df,gene,dates,vcf_folder):
 	############
 	# Reduces dataframe to one gene as we create one figure per gene to avoid crowding
 	df = df[df["gene"] == gene]
-	# Because of the way the dateframe is set up, it was easier to neccesary to iterate over the rows in the dataframe
+	# Because of the way the dateframe is set up, it was neccesary to iterate over the rows in the dataframe
 	x_dates, frequencies, y_aa= ([] for i in range(3))
 
 	for index, row in df.iterrows():
@@ -128,7 +135,7 @@ def create_gene_plot(df,gene,dates,vcf_folder):
 	# To use as labels, get unique AA changes and dates. As we want to maintain the sort on nucleotide positions, we have to do this in a slightly complicated manner that maintains the ordering by index
 	xlabs = [x_dates[index] for index in sorted(np.unique(x_dates, return_index=True)[1])]
 	ylabs = [y_aa[index] for index in sorted(np.unique(y_aa, return_index=True)[1])]
-
+	print(xlabs)
 	# set filename
 	plt_filename = 'pangenome_plot_'+gene+'.png'
 
@@ -139,17 +146,11 @@ def create_gene_plot(df,gene,dates,vcf_folder):
 
 	# create gradient legend
 	cm = plt.cm.get_cmap('coolwarm')
-	sc = plt.scatter(x_dates, y_aa, c=frequencies, s=100, cmap=cm)
+	sc = plt.scatter(x_dates, y_aa, c=frequencies, s=100, cmap=cm, vmin=0.0, vmax=1.0)
 	plt.colorbar(sc, fraction=0.046, pad=0.04)
 
 	# setting labels for x-axis and rotating
-	#ax.set_xticks(list(range(len(set(x_dates)))))
 	plt.xticks(ticks=range(len(xlabs)), labels=xlabs)
-
-
-	#plt.yticks(ticks=range(len(y_aa_values)), labels=y_aa_values)
-
-	#plt.xticks(rotation=300)
 
 	# setting labels for y-axis
 	plt.yticks(ticks=range(len(ylabs)), labels=ylabs)
