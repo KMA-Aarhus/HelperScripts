@@ -1,10 +1,11 @@
-## First time setup on ubuntu machines - installing samba
-<code>sudo apt install smbclient cifs-utils</code>
+Connect the minion MK1C to the internet
 
-## Mounting the transfering data
-<p>Plug the MinION to an ethernet connection. Get IP from the MinION itself. Resets if the devide has been disconnected. Check that connection works</p>
-<code>smbclient -L xx.xx.xx.xx -U minit </code>
-<p>Mount drive:</p>
+## Via filezilla
+In filezilla, set
+Host: mc-113039
+Username: minit
+Password: minit
+Port:22
 
-<code>sudo mount -t cifs -o vers=3.0,username=minit '//10.31.73.66/data' /mnt </code>
-<p>You can now view and copy from all data found in the data dir on the MinION</p>
+## Via ssh
+scp -R minit@mc-113039:/data/<run_dir> <destination>
