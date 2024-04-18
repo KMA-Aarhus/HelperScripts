@@ -22,6 +22,10 @@ https://github.com/epi2me-labs/wf-artic/tree/master/data/primer_schemes/SARS-CoV
 <p>Run as:</p>
 <code>python locate_move_vcf.py idXXX.tsv /SEARCH_FOLDER/ /TARGET_FOLDER/</code>
 
+<h3>find_overlap_accession.py</h3>
+This script compares a number of result files from NCBI BLAST. This is used for checking if primer/probes share any off-target hits that may result in false positives.
+The input is any number of Alignment Descriptions downloaded from the NCBI BLAST result page. The output is a csv files that contain the hits based on Scientific Name and Accession present in all input files.
+
 <h3>files_for_pangenome.py</h3>
 <p>This scripts takes as input a file of sample ids, one number per line, and finds the newest vcf and coverage mask files and copies them to a user specified location </p>
 <p>Input:</p>
