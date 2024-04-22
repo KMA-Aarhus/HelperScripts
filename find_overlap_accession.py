@@ -32,7 +32,7 @@ df = df.rename(columns={"Query Cover": f"Query Cover ({first_filename})",
 		"E value": f"E value ({first_filename})",
 		"Per. ident": f"Per. ident ({first_filename})"})
 
-df.to_csv("test.csv", sep=",")
+
 for f in sys.argv[2:]:
 	print("Processing: "+f)
 
