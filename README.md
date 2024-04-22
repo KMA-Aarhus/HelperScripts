@@ -26,6 +26,9 @@ https://github.com/epi2me-labs/wf-artic/tree/master/data/primer_schemes/SARS-CoV
 This script compares a number of result files from NCBI BLAST. This is used for checking if primer/probes share any off-target hits that may result in false positives.
 The input is any number of Alignment Descriptions downloaded from the NCBI BLAST result page. The output is a csv files that contain the hits based on Scientific Name and Accession present in all input files.
 
+<h3>find_pairwise_overlap.py</h3>
+Works similarly to find_pverlap_accession but takes as input a directory of Alignment Description files from NCBI. It then does pairwise comparisons of all the input files. The outputs are csv files, one for each pair, that contain the hits based on Scientific Name and Accession present in both input files. Files should be named as following example: 222Z43AJ013-Alignment-Descriptions_IS481R.csv. Here "222Z43AJ013-Alignment-Descriptions" is an example of the naming from BLAST and "IS481R" is the primer/probe name.
+
 <h3>files_for_pangenome.py</h3>
 <p>This scripts takes as input a file of sample ids, one number per line, and finds the newest vcf and coverage mask files and copies them to a user specified location </p>
 <p>Input:</p>
